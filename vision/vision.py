@@ -129,6 +129,8 @@ def get_inference(dl_node:CtrlxDlAPi, addr):
         x_center = bounding_box.CenterX() 
         y_center = bounding_box.CenterY() 
         angle = bounding_box.Angle() 
+        width = bounding_box.Width()
+        height = bounding_box.Height()
         instance = dict() 
         instance['score'] = score 
         instance['class_index'] = class_index
@@ -136,6 +138,8 @@ def get_inference(dl_node:CtrlxDlAPi, addr):
         box['center_x'] = x_center 
         box['center_y'] = y_center 
         box['angle'] = angle
+        box['width'] = width
+        box['height'] = height
         instance['oriented_bounding_box'] = box
         data['instances'].append(instance)
         
@@ -152,6 +156,11 @@ def get_inference(dl_node:CtrlxDlAPi, addr):
             letters[lookup[inst['class_index']]] = inst
 
     c_inst = letters.get('c',None)
+    c = None 
+    t = None 
+    r = None 
+    l = None 
+    x = None 
     if c_inst is not None:
         c = c_inst['oriented_bounding_box']
         c['score'] = c_inst['score']
@@ -181,15 +190,14 @@ def transform(H,resp):
     v1 = np.array([np.cos(rad),np.sin(rad)])
     J = get_J(H, x, y)
     v2 = J @ v1
-    #PLC has axis swaped
-    angle2 = np.arctan2(v2[0],v2[1])* 180/np.pi
+    angle2 = np.arctan2(v2[1],v2[0])* 180/np.pi
     point = np.array([x,y,1]).reshape((3, 1))
     point2 = np.dot(H,point)
     x2 = point2[1]/point2[2]
     y2 = point2[0]/point2[2]
     return {'x': x2[0], 'y': y2[0], 'angle': angle2}
 
-def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node) -> tuple[bool,ErrorCodes]:
+def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc) -> tuple[bool,ErrorCodes]:
     data = dl_node.read_node(camera_node +'/control/connect-camera/ready')
     if data.get_bool8():
         dl_node.write_node(camera_node + '/control/connect-camera/request', data)
@@ -257,27 +265,34 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node) -> tuple[bool,Er
         loc_c = transform(H, c)
         loc_c['class_index'] = 4
         loc_c['score'] = c['score']
+        draw_box(c['center_x'], c['center_y'], c['width'], c['height'],c['angle'],data)
         locations.append(loc_c)
     if t is not None:
         loc_t = transform(H, t)
         loc_t['class_index'] = 3
         loc_t['score'] = t['score']
+        draw_box(t['center_x'], t['center_y'], t['width'],t['height'],t['angle'],data)
         locations.append(loc_t)
     if r is not None:
         loc_r = transform(H, r)
         loc_r['class_index']= 2
         loc_r['score'] = r['score']
+        draw_box(r['center_x'], r['center_y'], r['width'], r['height'],r['angle'],data)
         locations.append(loc_r)
     if l is not None:
         loc_l = transform(H, l)
         loc_l['class_index']= 1
         loc_l['score'] = l['score']
+        draw_box(l['center_x'], l['center_y'], l['width'], l['height'],l['angle'],data)
         locations.append(loc_l)
     if x is not None:
         loc_x = transform(H, x)
         loc_x['class_index']= 0
         loc_x['score'] = x['score']
+        draw_box(x['center_x'], x['center_y'], x['width'], x['height'],x['angle'],data)
         locations.append(loc_x)
+    cv.imwrite(img_loc,data)
     dl_node.write_locations(locations)
+
 
     return True, ErrorCodes.NO_ERROR
