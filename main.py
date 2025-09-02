@@ -33,9 +33,9 @@ def main():
 
     app_data = AppDataControl()
     app_data.load()
-    app_server = get_app_server()
-    t= Thread(target= run_app_server,args=(app_server,))
-    t.start()
+    #app_server = get_app_server()
+    #t= Thread(target= run_app_server,args=(app_server,))
+    #t.start()
 
     camera_node = app_data.get_appdata()['camera_node']
     infer_node = app_data.get_appdata()['inference_node']
@@ -45,31 +45,34 @@ def main():
     api.start_sys(system) 
     api.create_end_points()
     while (not __close_app) and api.is_connected(): 
-        if api.get_request(): 
-            api.write_busy(True)
-            try_count = 0
-            while try_count < 10: 
-                success = run_vision(api,camera_node,infer_node) 
-                if success[0]:
-                    break
-                try_count += 1
+        try: 
+            if api.get_request(): 
+                api.write_busy(True)
+                try_count = 0
+                while try_count < 10: 
+                    success = run_vision(api,camera_node,infer_node,app_data.get_img_loc()) 
+                    if success[0]:
+                        break
+                    try_count += 1
 
-            api.write_busy(False)
-            if not success[0]: 
-                api.write_error(True)
-                api.write_error_code(success[1])
-            else:
-                api.write_done(True)
-            while api.get_request(): 
-                time.sleep(.05)
-            api.write_done(False)
-            api.write_error(False)
-            api.write_error_code(ErrorCodes.NO_ERROR)
-        else: 
-            time.sleep(0.05)
+                api.write_busy(False)
+                if not success[0]: 
+                    api.write_error(True)
+                    api.write_error_code(success[1])
+                else:
+                    api.write_done(True)
+                while api.get_request(): 
+                    time.sleep(.05)
+                api.write_done(False)
+                api.write_error(False)
+                api.write_error_code(ErrorCodes.NO_ERROR)
+            else: 
+                time.sleep(0.05)
+        except Exception as e: 
+            api.write_error_code(ErrorCodes.DL_FAIL)
     system.stop(True)
-    app_server.shutdown()
-    t.join()
+    #app_server.shutdown()
+   # t.join()
 
 def get_app_server(): 
     # Start webserver to get load/save rest requests
@@ -78,6 +81,7 @@ def get_app_server():
         webserver = create_webserver_unixsock()
     else:
         webserver = create_webserver_tcp()
+    return webserver
 def run_app_server(webserver):
     webserver.serve_forever()
     
@@ -109,4 +113,5 @@ def create_webserver_unixsock():
 
 
 if __name__ == '__main__':
+    time.sleep(10)
     main()

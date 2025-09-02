@@ -11,8 +11,15 @@
         "restricted": [
           "/sdk-py-location-transform/api/v1"
         ]
+      },
+      {
+        "name":"sdk-py-location-transform-img.web", 
+        "url" :"/sdk-py-location-transform-img",
+        "binding": "unix://{$SNAP_DATA}/package-run/sdk-py-location-transform/web.sock",
+        "restricted": []
       }
     ]
+    
   },
   "commands": {
     "activeConfiguration": {

@@ -40,8 +40,10 @@ class AppDataControl():
 
         self.appdata = {
             "camera_node": "",
-            "inference_node": ""
+            "inference_node": "", 
+            "png_loc": ""
         }
+        self.img_file_name = os.path.join(self.storage_location,'img.png')
 
     def load(self):
         """load
@@ -104,7 +106,8 @@ class AppDataControl():
         # Set default application data
         data = {
             "camera_node": "hdvisionsystems/lumiscan-cam-driver/camera1",
-            "inference_node": "hdvisionsystems/lumiscan-ai-object-matching/example"
+            "inference_node": "hdvisionsystems/lumiscan-ai-object-matching/example",
+            "png_loc" : self.img_file_name
         }
 
         result = AppDataControl.set_appdata(self, data)
@@ -155,3 +158,5 @@ class AppDataControl():
         """get_appdata
         """
         return self.appdata
+    def get_img_loc(self): 
+        return self.img_file_name
