@@ -237,9 +237,11 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc) -> tupl
     try:
         pt_src = get_corners(data)
     except Exception as e: 
+        cv.imwrite(img_loc,data)
         return False, ErrorCodes.NO_SCREWS
     found = True
     if pt_src.size == 0:
+        cv.imwrite(img_loc,data)
         return False, ErrorCodes.NO_SCREWS
     for pt in pt_src:
         if pt[0] ==0 and pt[1] == 0:
@@ -259,6 +261,7 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc) -> tupl
     try:
         c,t,r,l,x = get_inference(dl_node, inference_node)
     except Exception as e: 
+        cv.imwrite(img_loc,data)
         return False, ErrorCodes.VISION_EXCEPTION
     locations = [] 
     if c is not None:

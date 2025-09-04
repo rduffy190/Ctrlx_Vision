@@ -11,12 +11,6 @@
         "restricted": [
           "/sdk-py-location-transform/api/v1"
         ]
-      },
-      {
-        "name":"sdk-py-location-transform-img.web", 
-        "url" :"/sdk-py-location-transform-img",
-        "binding": "unix://{$SNAP_DATA}/package-run/sdk-py-location-transform/web.sock",
-        "restricted": []
       }
     ]
     
@@ -27,14 +21,14 @@
         {
           "id": "sdk-py-location-transform",
           "subject": "location-transform.py",
-          "url": "https://localhost/sdk-py-location/api/v1/load"
+          "url": "https://localhost/sdk-py-location-transform/api/v1/load"
         }
       ],
       "save": [
         {
           "id": "sdk-py-location-transform",
           "subject": "location-transform.py",
-          "url": "https://localhost/sdk-py-appdata/api/v1/save"
+          "url": "https://localhost/sdk-py-location-transform/api/v1/save"
         }
       ]
     }
@@ -52,7 +46,7 @@
         },
         {
           "identifier": "sdk-py-location-transform.web.r",
-          "name": "View Location Trasform",
+          "name": "View Location Transform",
           "description": ""
         }
       ]
@@ -61,7 +55,7 @@
   "configuration": {
     "appDirectories": [
       {
-        "name": "LocationTransform",
+        "name": "Image Space to PCS",
         "description": "Location Transform from Pixel to Robot Space",
         "icon": "bosch-ic-directory",
         "copyOnLoad": true

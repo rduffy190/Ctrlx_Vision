@@ -289,7 +289,7 @@ class CtrlxDlAPi():
     def is_provider_connected(self)-> bool: 
         return self.__provider.is_connected() 
     
-    def __del__(self): 
+    def close(self): 
         if self.__provider is not None:
             self.__provider.unregister_type('types/transform_loc/location_data')
             self.__provider.close()
