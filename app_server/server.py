@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 from socketserver import UnixStreamServer
 from urllib.parse import unquote
 from json import loads
-
+import base64
 from  appdata.app_data_control import AppDataControl
 
 from app_server.token import TokenValidation
@@ -18,12 +18,11 @@ from app_server.token import TokenValidation
 class Server(BaseHTTPRequestHandler):
     """Server
     """
-    rest_url_load = '/sdk-py-locationtransform/api/v1/load'
-    rest_url_save = '/sdk-py-locationtransform/api/v1/save'
+    rest_url_load = '/sdk-py-location-transform/api/v1/load'
+    rest_url_save = '/sdk-py-location-transform/api/v1/save'
     img_url       = '/sdk-py-location-transform/view'
 
     app_data_control = AppDataControl()
-    app_data_control.load() 
 
     config_payload = {
         "configurationPath": "",
@@ -50,7 +49,7 @@ class Server(BaseHTTPRequestHandler):
                 self.send_error(HTTPStatus.UNAUTHORIZED)
                 print("ERROR Not authorized (Bearer invalid)", flush=True)
                 return False
-        if request_url == Server.img_url: 
+        if Server.img_url in request_url: 
             if self.command != 'GET':
                 self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
                 return False
@@ -60,25 +59,38 @@ class Server(BaseHTTPRequestHandler):
     def do_GET(self):
         Server.app_data_control.load()
         img = Server.app_data_control.get_img_loc()
-        if self.path == "/sdk-py-location-transform-img/view" or self.path == "/sdk-py-location-transform-img/view":
-            html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>PNG Viewer</title>
-        </head>
-        <body>
-            <h1>Here is the PNG:</h1>
-            <img src="{img}" alt="PNG Image" style="max-width:600px;">
-        </body>
-        </html>
-        """
+        with open(img, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        if "/sdk-py-location-transform/view" in self.path:
+            html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html, body {{
+    margin: 0;
+    height: 100%;
+}}
+img {{
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    margin-left: auto;
+    margin-right: auto;
+}}
+</style>
+</head>
+<body>
+    <img src="data:image/png;base64,{b64}" alt="PNG Image">
+</body>
+</html>
+""" 
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.end_headers()
             self.wfile.write(html.encode("utf-8"))
         else:
-            self.send_error(HTTPStatus.NOT_FOUND, "Not Found")
+            self.send_error(HTTPStatus.BAD_REQUEST, "Not Found")
 
 
     def __check_request_payload(self):

@@ -27,15 +27,17 @@ def handler(signum, frame):
 def main():
     """main
     """
+    global __close_app
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)
     signal.signal(signal.SIGABRT, handler)
 
     app_data = AppDataControl()
     app_data.load()
-    #app_server = get_app_server()
-    #t= Thread(target= run_app_server,args=(app_server,))
-    #t.start()
+    app_server = get_app_server()
+    t= Thread(target= run_app_server,args=(app_server,))
+    t.start()
+    time.sleep(10)
 
     camera_node = app_data.get_appdata()['camera_node']
     infer_node = app_data.get_appdata()['inference_node']
@@ -67,12 +69,23 @@ def main():
                 api.write_error(False)
                 api.write_error_code(ErrorCodes.NO_ERROR)
             else: 
+                if not api.is_connected(): 
+                    __close_app = True 
+                    break
                 time.sleep(0.05)
         except Exception as e: 
             api.write_error_code(ErrorCodes.DL_FAIL)
+            if not api.is_connected():
+                __close_app = True
+    system.close()
     system.stop(True)
-    #app_server.shutdown()
-   # t.join()
+    api.close()
+    app_server.shutdown()
+    t.join()
+    app_server.server_close()
+    sock_dir = os.getenv('SNAP_DATA') + '/package-run/sdk-py-location-transform/'
+    sock_file = sock_dir + 'web.sock'
+    os.remove(sock_file)
 
 def get_app_server(): 
     # Start webserver to get load/save rest requests
@@ -99,7 +112,7 @@ def create_webserver_tcp():
 def create_webserver_unixsock():
     """create_webserver_unixsock
     """
-    sock_dir = os.getenv('SNAP_DATA') + '/package-run/sdk-py-appdata/'
+    sock_dir = os.getenv('SNAP_DATA') + '/package-run/sdk-py-location-transform/'
     sock_file = sock_dir + 'web.sock'
     if not os.path.exists(sock_dir):
         os.makedirs(sock_dir)
@@ -113,5 +126,4 @@ def create_webserver_unixsock():
 
 
 if __name__ == '__main__':
-    time.sleep(10)
     main()
