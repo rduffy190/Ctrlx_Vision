@@ -7,3 +7,5 @@ venv/
 .editorconfig
 solutions/
 setup.cfg
+*.snap 
+

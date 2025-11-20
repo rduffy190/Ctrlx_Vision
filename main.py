@@ -41,6 +41,14 @@ def main():
 
     camera_node = app_data.get_appdata()['camera_node']
     infer_node = app_data.get_appdata()['inference_node']
+    c_loc = app_data.get_appdata()['c_template']
+    l_loc = app_data.get_appdata()['l_template']
+    use_template = dict() 
+    template_loc = dict() 
+    use_template['c'] = True 
+    template_loc['c'] = c_loc
+    use_template['l'] = True
+    template_loc['l'] = l_loc
     api = CtrlxDlAPi()
     system = ctrlxdatalayer.system.System('')
     system.start(False)
@@ -52,7 +60,7 @@ def main():
                 api.write_busy(True)
                 try_count = 0
                 while try_count < 10: 
-                    success = run_vision(api,camera_node,infer_node,app_data.get_img_loc()) 
+                    success = run_vision(api,camera_node,infer_node,app_data.get_img_loc(),use_template,template_loc) 
                     if success[0]:
                         break
                     try_count += 1
@@ -75,6 +83,7 @@ def main():
                 time.sleep(0.05)
         except Exception as e: 
             api.write_error_code(ErrorCodes.DL_FAIL)
+            time.sleep(0.05)
             if not api.is_connected():
                 __close_app = True
     system.close()

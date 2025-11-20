@@ -6,3 +6,4 @@ ctrlx-fbs
 numpy
 flatbuffers
 opencv-python-headless
+scipy

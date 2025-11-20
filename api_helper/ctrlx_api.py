@@ -156,11 +156,13 @@ class CtrlxDlAPi():
         self.__done_node = None
         self.__error_node = None
         self.__error_code_node = None
+        self.__inference_time_node = None
+        self.__capture_time_node = None
         pass
     def start_sys(self, datalayer_system): 
         self.__provider, connection_string = get_provider(
-        datalayer_system, ip="192.168.1.1", ssl_port=443)
-        self.__client, connection_string = get_client( datalayer_system, ip="192.168.1.1", ssl_port=443)
+        datalayer_system, ip="192.168.3.138", ssl_port=443)
+        self.__client, connection_string = get_client( datalayer_system, ip="192.168.3.138", ssl_port=443)
         if self.__provider is not None and self.__client is not None: 
             self.__provider.start()
             return True 
@@ -214,6 +216,18 @@ class CtrlxDlAPi():
                                    read_only)
         self.__error_node.register_node()
 
+        real_value = Variant() 
+        real_value.set_float32(0.0)
+        self.__inference_time_node = Node(self.__provider, root_node + '/Status/Inference_Time', 'types/datalayer/float32', real_value,
+                                   read_only)
+        self.__inference_time_node.register_node()
+
+        real_value = Variant() 
+        real_value.set_float32(0.0)
+        self.__capture_time_node = Node(self.__provider, root_node + '/Status/Capture_Time', 'types/datalayer/float32', real_value,
+                                   read_only)
+        self.__capture_time_node.register_node()
+
         str_value = Variant() 
         str_value.set_string(ErrorCodes.NO_ERROR.name)
         self.__error_code_node = Node(self.__provider, root_node + '/Status/ErrorDescription', 'types/datalayer/string', str_value,
@@ -242,6 +256,16 @@ class CtrlxDlAPi():
         str_value = Variant() 
         str_value.set_string(data.name)
         self.__error_code_node.set_value(str_value)
+
+    def write_inference_time_node(self,inf_time): 
+        value = Variant() 
+        value.set_float32(inf_time)
+        self.__inference_time_node.set_value(value)
+    
+    def write_cature_time_node(self, capt_time): 
+        value = Variant() 
+        value.set_float32(capt_time)
+        self.__capture_time_node.set_value(value)
 
     def write_locations(self,locations): 
         builder = flatbuffers.Builder() 

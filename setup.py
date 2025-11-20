@@ -15,6 +15,7 @@ setup(
         'ctrlx-datalayer<=3.5',
         'ctrlx-fbs',
         'numpy',
+        'scipy',
         'flatbuffers',
         'opencv-python-headless'
     ],

@@ -73,7 +73,7 @@ def get_connection_string(
 
 
 def get_client(system: ctrlxdatalayer.system.System,
-               ip="192.168.1.1",
+               ip="192.168.3.138",
                user="boschrexroth",
                password="boschrexroth",
                ssl_port=443):
@@ -100,7 +100,7 @@ def get_client(system: ctrlxdatalayer.system.System,
 
 
 def get_provider(system: ctrlxdatalayer.system.System,
-                 ip="192.168.1.1",
+                 ip="192.168.3.138",
                  user="boschrexroth",
                  password="boschrexroth",
                  ssl_port=443):
