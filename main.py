@@ -23,6 +23,21 @@ def handler(signum, frame):
     global __close_app
     __close_app = True
 
+def run_demo(api): 
+    locations = list()
+    time.sleep(1) 
+    loc = {'x': 192.5, 'y': 205.6, 'angle': 92.6, 'score': 91.2, 'class_index': 0}
+    locations.append(loc) 
+    loc = {'x': 1.5, 'y': 5.6, 'angle': 82.2, 'score': 88.3, 'class_index': 1}
+    locations.append(loc) 
+    loc = {'x': 192.5, 'y': 108.3, 'angle': 43.2, 'score': 82.2, 'class_index': 2}
+    locations.append(loc) 
+    loc = {'x': 88.4, 'y': 28, 'angle': 32.6, 'score': 92.5, 'class_index': 3}
+    locations.append(loc) 
+    loc = {'x': 153, 'y': 205.6, 'angle': 12.6, 'score': 76.4, 'class_index': 4}
+    locations.append(loc) 
+    api.write_locations(locations)
+    return (True,True)
 
 def main():
     """main
@@ -45,9 +60,9 @@ def main():
     l_loc = app_data.get_appdata()['l_template']
     use_template = dict() 
     template_loc = dict() 
-    use_template['c'] = True 
+    use_template['c'] = False
     template_loc['c'] = c_loc
-    use_template['l'] = True
+    use_template['l'] = False
     template_loc['l'] = l_loc
     api = CtrlxDlAPi()
     system = ctrlxdatalayer.system.System('')
@@ -61,6 +76,7 @@ def main():
                 try_count = 0
                 while try_count < 10: 
                     success = run_vision(api,camera_node,infer_node,app_data.get_img_loc(),use_template,template_loc) 
+                    #success = run_demo(api)
                     if success[0]:
                         break
                     try_count += 1
