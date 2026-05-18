@@ -8,4 +8,5 @@ venv/
 solutions/
 setup.cfg
 *.snap 
+*.png
 

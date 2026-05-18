@@ -60,9 +60,9 @@ def main():
     l_loc = app_data.get_appdata()['l_template']
     use_template = dict() 
     template_loc = dict() 
-    use_template['c'] = False
+    use_template['c'] = True
     template_loc['c'] = c_loc
-    use_template['l'] = False
+    use_template['l'] = True
     template_loc['l'] = l_loc
     api = CtrlxDlAPi()
     system = ctrlxdatalayer.system.System('')
@@ -93,11 +93,13 @@ def main():
                 api.write_error(False)
                 api.write_error_code(ErrorCodes.NO_ERROR)
             else: 
+                api.write_error(False)
                 if not api.is_connected(): 
                     __close_app = True 
                     break
                 time.sleep(0.05)
         except Exception as e: 
+            api.write_error(True)
             api.write_error_code(ErrorCodes.DL_FAIL)
             time.sleep(0.05)
             if not api.is_connected():

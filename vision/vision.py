@@ -12,40 +12,47 @@ from time import time_ns
 lookup = {0: 'x',1:'l', 2:'r', 3:'t', 4: 'c' }
 
 
-def template_match(template, img, use_mask = False, use_noise= False, rot = 36, rot_fact = 10):
+def template_match(template, img, use_mask = False, use_noise= False, rot = 36, rot_fact = 10, function = cv.TM_CCORR_NORMED, invert = False):
     img_rot = 0
     n_rot = 0
     last_max = 0
     tmask = None
+    bRotate = False
     if use_noise:
-        noise = np.random.uniform(40,220,template.shape).astype(np.uint8)
+        noise = np.random.uniform(0,256,template.shape).astype(np.uint8)
     else:
         noise = 220
     while n_rot < rot:
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.rotate.html
-        if use_noise: 
+        if use_noise or use_mask: 
             c_val = -1
         else: 
             c_val = 220
         rot_img = ndimage.rotate(template, rot_fact * n_rot, reshape=False,mode='constant', cval=c_val, order=3)
         if use_noise:
-            rot_img = np.where(rot_img == -1,noise,rot_img)
+            rot_img = np.where(rot_img < 0,noise,rot_img)
         if use_mask:
-            tmask = np.where(rot_img == 220, 0, 1).astype(np.uint8)
-        match = cv.matchTemplate(img,rot_img, cv.TM_CCORR_NORMED,mask=tmask)
+            tmask = np.where(rot_img <0, 0, 1).astype(np.uint8)
+        match = cv.matchTemplate(img,rot_img, function,mask=tmask)
+        #cv.imwrite('rot_temp' + str(n_rot) + '.png', rot_img)
+        if invert:
+            match = -match
         max_val = np.max(match)
         if max_val > last_max:
             last_max = max_val
             img_rot = n_rot
             bRotate = True
         n_rot = n_rot + 1
+    internal_template = rot_img
     if bRotate:
         internal_template = ndimage.rotate(template, rot_fact * img_rot, reshape=False,mode='constant', cval=220, order=3)
         if use_noise:
             internal_template = np.where(internal_template == 220,noise,internal_template)
     if use_mask:
-        tmask = np.where(internal_template == 220, 0, 1).astype(np.uint8)
-    match = cv.matchTemplate(img,internal_template,cv.TM_CCORR_NORMED, mask = tmask)
+        tmask = np.where(internal_template == -1, 0, 1).astype(np.uint8)
+    match = cv.matchTemplate(img,internal_template, function, mask = tmask)
+    if invert:
+        match = - match
     #cv2.imshow('x', internal_template)
     #cv2.waitKey(0)
     points = np.argwhere(match == match.max())
@@ -246,6 +253,7 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         dl_node.write_node(camera_node + '/control/connect-camera/request', data)
         while data.get_bool8():
             data = dl_node.read_node(camera_node + '/control/connect-camera/ready')
+            time.sleep(0.01)
         data.set_bool8(False)
         dl_node.write_node(camera_node + '/control/connect-camera/request',
                            data)
@@ -266,10 +274,11 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         data = dl_node.read_node(camera_node +'/control/capture/ready')
         time.sleep(0.050)
     r = dl_node.read_image(camera_node + '/output/image/data')
-    data = np.frombuffer(r, dtype=np.uint8)
+    img = np.frombuffer(r, dtype=np.uint8)
+    data = img.astype(np.float64)
     if data.size == 0:
         return
-    data = data.astype(np.float64)
+    data = img.astype(np.float64)
     data = data.reshape((1080, 1440))
     _max = np.max(data)
     data = 1.2 * data
@@ -297,11 +306,12 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         return False, ErrorCodes.NO_SCREWS
    
     screw_from_edge = 15
+    zero_offset = 15
     back_size = 250
-    pts_dest = np.array([[screw_from_edge, screw_from_edge],
-                             [screw_from_edge, back_size - screw_from_edge],
-                             [back_size - screw_from_edge, screw_from_edge],
-                             [back_size - screw_from_edge, back_size - screw_from_edge]],
+    pts_dest = np.array([[screw_from_edge - zero_offset, screw_from_edge - zero_offset],
+                             [screw_from_edge - zero_offset, back_size - screw_from_edge - zero_offset],
+                             [back_size - screw_from_edge - zero_offset, screw_from_edge - zero_offset],
+                             [back_size - screw_from_edge - zero_offset, back_size - screw_from_edge - zero_offset]],
                             dtype=np.float32)
     H, status = cv.findHomography(pt_src, pts_dest)
     try:
@@ -314,14 +324,27 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         cv.imwrite(img_loc,data)
         return False, ErrorCodes.VISION_EXCEPTION
     locations = [] 
+    tm_data = img.astype(np.float64)
+    tm_data = tm_data.reshape((1080, 1440))
+    _max = np.max(tm_data)
+    tm_data = 2.5 * tm_data
+    tm_data = np.where(data > _max, _max, tm_data)
+    _min = np.min(tm_data)
+    tm_data = tm_data - _min
+    _max = np.max(tm_data)
+    tm_data = (tm_data * 255) / _max
+    tm_data = tm_data.astype(np.uint8)
     if c is not None:
         
         if 'c' in use_template: 
             if use_template['c']: 
-                c_data = data[round(c['center_y'])-150 : round(c['center_y'])+ 150, round(c['center_x']-150) : round(c['center_x']+150)]
+                c_data = tm_data[round(c['center_y'])-150 : round(c['center_y'])+ 150, round(c['center_x']-150) : round(c['center_x']+150)]
                 c_temp = cv.imread(template_loc['c'], cv.IMREAD_GRAYSCALE)
                 c_temp = c_temp.astype(np.float32)
-                p = template_match(c_temp,c_data.astype(np.float32),rot = 72, rot_fact = 5)
+                c_temp = np.pad(c_temp, ((0, 0), (12, 12)), mode='constant', constant_values=-1)
+                noise = np.random.uniform(np.random.randint(0, 256, c_temp.shape, dtype=np.uint8)).astype(np.float32)
+                c_temp = np.where(c_temp == -1, noise,c_temp)
+                p = template_match(c_temp,c_data.astype(np.float32),rot = 180, rot_fact = 2, use_noise = True)
                 c['center_x'] = p[0][0] - 150 + c['center_x']
                 c['center_y'] = p[0][1] - 150 + c['center_y']
                 ang = p[1]
@@ -329,9 +352,8 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
                     ang = ang + 360
                 c['angle'] = ang
                
-
-                c['width'] = 153 
-                c['height'] = 153
+                c['width'] = 146 
+                c['height'] = 170
         draw_box(c['center_x'], c['center_y'], c['width'], c['height'],c['angle'],data)
         loc_c = transform(H, c)
         loc_c['class_index'] = 4
@@ -352,21 +374,20 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
     if l is not None:
         if 'l' in use_template: 
             if use_template['l']: 
-                l_data = data[round(l['center_y']-98) : round(l['center_y']+ 98), round(l['center_x']-98) : round(l['center_x'] + 98)]
+                l_data = tm_data[round(l['center_y']-140) : round(l['center_y']+ 140), round(l['center_x']-140) : round(l['center_x'] + 140)]
                 l_temp = cv.imread(template_loc['l'], cv.IMREAD_GRAYSCALE)
                 l_temp = l_temp.astype(np.float32)
-                l_temp = np.pad(l_temp, ((0, 0), (60, 60)), mode='constant', constant_values=-1)
-                noise = np.random.uniform(np.random.randint(0, 256, l_temp.shape, dtype=np.uint8)).astype(np.float32)
-                l_temp = np.where(l_temp == -1, noise,l_temp)
-                p = template_match(l_temp,l_data.astype(np.float32),rot = 72, rot_fact = 2.5, use_noise=True)
-                l['center_x'] = p[0][0] - 98 + l['center_x']
-                l['center_y'] = p[0][1] - 98 + l['center_y']
+                l_temp = np.pad(l_temp, ((1, 1), (90, 90)), mode='constant', constant_values=-1)
+                #cv.imwrite('/home/riley/Dev/Ctrlx_Vision/l_temp.png',l_temp.astype(np.uint8))
+                p = template_match(l_temp,l_data.astype(np.float32),rot = 72, rot_fact = 2.5, use_mask=True)
+                l['center_x'] = p[0][0] - 140 + l['center_x']
+                l['center_y'] = p[0][1] - 140 + l['center_y']
                 ang = p[1]
                 if ang < -180: 
                     ang += 360
                 l['angle'] = ang
-                l['width'] = 67 
-                l['height'] = 186
+                l['width'] = 59 
+                l['height'] = 233
 
         loc_l = transform(H, l)
         loc_l['class_index']= 1
