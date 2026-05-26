@@ -257,14 +257,32 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         data.set_bool8(False)
         dl_node.write_node(camera_node + '/control/connect-camera/request',
                            data)
+    data = dl_node.read_node(camera_node + '/control/capture/ready')
     payload = Variant()
+    count = 0
+    while not data.get_bool8(): 
+        payload.set_bool8(False)
+        dl_node.write_node(camera_node + '/control/capture/request', payload)
+        data = dl_node.read_node(camera_node + '/control/capture/ready')
+        time.sleep(0.050)
+        count = count + 1
+        if count >50 : 
+            return False, ErrorCodes.DL_FAIL
+
     payload.set_bool8(True)
     dl_node.write_node(camera_node + '/control/capture/request', payload)
     start = time_ns()
     data = dl_node.read_node(camera_node + '/control/capture/ready')
+    count = 0
     while data.get_bool8():
         data = dl_node.read_node(camera_node + '/control/capture/ready')
         time.sleep(0.050)
+        count = count + 1
+        if count >50 : 
+            payload.set_bool8(False)
+            dl_node.write_node(camera_node + '/control/capture/request', payload)
+            return False, ErrorCodes.DL_FAIL
+            
     end = time_ns() 
     dl_node.write_cature_time_node((end - start)* 1E-6)
     payload.set_bool8(False)
@@ -324,29 +342,32 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         cv.imwrite(img_loc,data)
         return False, ErrorCodes.VISION_EXCEPTION
     locations = [] 
-    tm_data = img.astype(np.float64)
-    tm_data = tm_data.reshape((1080, 1440))
-    _max = np.max(tm_data)
-    tm_data = 2.5 * tm_data
-    tm_data = np.where(data > _max, _max, tm_data)
-    _min = np.min(tm_data)
-    tm_data = tm_data - _min
-    _max = np.max(tm_data)
-    tm_data = (tm_data * 255) / _max
-    tm_data = tm_data.astype(np.uint8)
+    tm_data = None
+    for key in use_template.keys(): 
+        if use_template[key]:
+            tm_data = img.astype(np.float64)
+            tm_data = tm_data.reshape((1080, 1440))
+            _max = np.max(tm_data)
+            tm_data = 2.5 * tm_data
+            tm_data = np.where(data > _max, _max, tm_data)
+            _min = np.min(tm_data)
+            tm_data = tm_data - _min
+            _max = np.max(tm_data)
+            tm_data = (tm_data * 255) / _max
+            tm_data = tm_data.astype(np.uint8)
     if c is not None:
         
         if 'c' in use_template: 
             if use_template['c']: 
-                c_data = tm_data[round(c['center_y'])-150 : round(c['center_y'])+ 150, round(c['center_x']-150) : round(c['center_x']+150)]
-                c_temp = cv.imread(template_loc['c'], cv.IMREAD_GRAYSCALE)
+                c_data = tm_data[round(c['center_y'])-100 : round(c['center_y'])+ 100, round(c['center_x']-100) : round(c['center_x']+100)]
+                c_temp = template_loc['c']
                 c_temp = c_temp.astype(np.float32)
                 c_temp = np.pad(c_temp, ((0, 0), (12, 12)), mode='constant', constant_values=-1)
                 noise = np.random.uniform(np.random.randint(0, 256, c_temp.shape, dtype=np.uint8)).astype(np.float32)
                 c_temp = np.where(c_temp == -1, noise,c_temp)
                 p = template_match(c_temp,c_data.astype(np.float32),rot = 180, rot_fact = 2, use_noise = True)
-                c['center_x'] = p[0][0] - 150 + c['center_x']
-                c['center_y'] = p[0][1] - 150 + c['center_y']
+                c['center_x'] = p[0][0] - 100 + c['center_x']
+                c['center_y'] = p[0][1] - 100 + c['center_y']
                 ang = p[1]
                 if ang < -180: 
                     ang = ang + 360
@@ -375,7 +396,7 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         if 'l' in use_template: 
             if use_template['l']: 
                 l_data = tm_data[round(l['center_y']-140) : round(l['center_y']+ 140), round(l['center_x']-140) : round(l['center_x'] + 140)]
-                l_temp = cv.imread(template_loc['l'], cv.IMREAD_GRAYSCALE)
+                l_temp = template_loc['l']
                 l_temp = l_temp.astype(np.float32)
                 l_temp = np.pad(l_temp, ((1, 1), (90, 90)), mode='constant', constant_values=-1)
                 #cv.imwrite('/home/riley/Dev/Ctrlx_Vision/l_temp.png',l_temp.astype(np.uint8))

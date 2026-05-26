@@ -16,6 +16,8 @@ from vision.vision import run_vision
 from vision.error_codes import ErrorCodes
 import signal
 from threading import Thread
+import cv2 as cv
+
 __close_app = False
 
 def handler(signum, frame):
@@ -61,9 +63,10 @@ def main():
     use_template = dict() 
     template_loc = dict() 
     use_template['c'] = True
-    template_loc['c'] = c_loc
+    template_loc['c'] = cv.imread(c_loc, cv.IMREAD_GRAYSCALE)
     use_template['l'] = True
-    template_loc['l'] = l_loc
+    template_loc['l'] = cv.imread(l_loc, cv.IMREAD_GRAYSCALE)
+
     api = CtrlxDlAPi()
     system = ctrlxdatalayer.system.System('')
     system.start(False)
@@ -102,6 +105,11 @@ def main():
             api.write_error(True)
             api.write_error_code(ErrorCodes.DL_FAIL)
             time.sleep(0.05)
+            while api.get_request(): 
+                time.sleep(.05)
+            api.write_done(False)
+            api.write_error(False)
+            api.write_error_code(ErrorCodes.NO_ERROR)
             if not api.is_connected():
                 __close_app = True
     system.close()
