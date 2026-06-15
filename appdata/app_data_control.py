@@ -111,7 +111,11 @@ class AppDataControl():
             "inference_node": "hdvisionsystems/lumiscan-ai-object-matching/example",
             "png_loc" : self.img_file_name,
             "c_template" : self.c_template_name,
-            "l_template" : self.l_template_name
+            "l_template" : self.l_template_name,
+            "use_template_l" : True,
+            "use_template_c" : True,
+            "cam_simulation"     : False,
+            "no_sim_images"   : 0
         }
 
         result = AppDataControl.set_appdata(self, data)

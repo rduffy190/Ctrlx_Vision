@@ -54,7 +54,7 @@ def main():
     app_server = get_app_server()
     t= Thread(target= run_app_server,args=(app_server,))
     t.start()
-    time.sleep(10)
+    time.sleep(1)
 
     camera_node = app_data.get_appdata()['camera_node']
     infer_node = app_data.get_appdata()['inference_node']
@@ -62,25 +62,28 @@ def main():
     l_loc = app_data.get_appdata()['l_template']
     use_template = dict() 
     template_loc = dict() 
-    use_template['c'] = True
+    use_template['c'] = app_data.get_appdata()['use_template_c']
     template_loc['c'] = cv.imread(c_loc, cv.IMREAD_GRAYSCALE)
-    use_template['l'] = True
+    use_template['l'] = app_data.get_appdata()['use_template_l']
     template_loc['l'] = cv.imread(l_loc, cv.IMREAD_GRAYSCALE)
-
+    simulation = app_data.get_appdata()['cam_simulation']
+    no_sim_images = app_data.get_appdata()['no_sim_images']
     api = CtrlxDlAPi()
     system = ctrlxdatalayer.system.System('')
     system.start(False)
     api.start_sys(system) 
     api.create_end_points()
+    i = 0
     while (not __close_app) and api.is_connected(): 
         try: 
             if api.get_request(): 
                 api.write_busy(True)
                 try_count = 0
                 while try_count < 10: 
-                    success = run_vision(api,camera_node,infer_node,app_data.get_img_loc(),use_template,template_loc) 
+                    success = run_vision(api,camera_node,infer_node,app_data.get_img_loc(),use_template,template_loc,simulation, i, no_sim_images) 
                     #success = run_demo(api)
                     if success[0]:
+                        i += 1
                         break
                     try_count += 1
 
@@ -103,11 +106,12 @@ def main():
                 time.sleep(0.05)
         except Exception as e: 
             api.write_error(True)
-            api.write_error_code(ErrorCodes.DL_FAIL)
+            api.write_error_code(ErrorCodes.UNKOWN_EXCEPTION)
             time.sleep(0.05)
             while api.get_request(): 
                 time.sleep(.05)
             api.write_done(False)
+            api.write_busy(False)
             api.write_error(False)
             api.write_error_code(ErrorCodes.NO_ERROR)
             if not api.is_connected():

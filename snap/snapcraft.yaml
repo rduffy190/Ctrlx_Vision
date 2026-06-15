@@ -1,6 +1,6 @@
 name: sdk-py-location-transform
 title: HD Vision Helper
-version: 1.0.8
+version: 1.1.1
 summary: Controls the HD Vision Camera and AI and returns Robot Space locations
 description: |
   This app is used to locate the Ctrlx letters relative to the location on the board.

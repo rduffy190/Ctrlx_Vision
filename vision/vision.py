@@ -9,8 +9,8 @@ from vision.error_codes import ErrorCodes
 from scipy import ndimage
 from time import time_ns
 
+#lookup = {1: 'x',2:'l', 3:'r', 4:'t', 0: 'c' }
 lookup = {0: 'x',1:'l', 2:'r', 3:'t', 4: 'c' }
-
 
 def template_match(template, img, use_mask = False, use_noise= False, rot = 36, rot_fact = 10, function = cv.TM_CCORR_NORMED, invert = False):
     img_rot = 0
@@ -105,8 +105,6 @@ def get_corners(img):
             dist_screw.append(sqrt((c[0] - s[0])**2 + (c[1] - s[1])**2))
         src_arr[np.argmin(np.array(dist_screw))] = np.array(c)
     return src_arr.astype(np.float32)
-
-lookup = {0: 'x',1:'l', 2:'r', 3:'t', 4: 'c' }
 
 def get_J(H, x, y):
     h11, h12, h13 = H[0]
@@ -247,52 +245,91 @@ def transform(H,resp):
     y2 = point2[0]/point2[2]
     return {'x': x2[0], 'y': y2[0], 'angle': angle2}
 
-def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_template, template_loc) -> tuple[bool,ErrorCodes]:
-    data = dl_node.read_node(camera_node +'/control/connect-camera/ready')
-    if data.get_bool8():
-        dl_node.write_node(camera_node + '/control/connect-camera/request', data)
-        while data.get_bool8():
-            data = dl_node.read_node(camera_node + '/control/connect-camera/ready')
-            time.sleep(0.01)
-        data.set_bool8(False)
-        dl_node.write_node(camera_node + '/control/connect-camera/request',
+def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_template, template_loc, simulate, run_count = 0, sim_images = 0) -> tuple[bool,ErrorCodes]:
+    if simulate:
+        data = dl_node.read_node(camera_node + '/control/load/ready')
+        if not data.get_bool8():
+            payload = Variant()
+            payload.set_bool8(True)
+            dl_node.write_node(camera_node + '/control/list-images/request',payload)
+            data = dl_node.read_node(camera_node + '/control/list-images/ready')
+            while data.get_bool8(): 
+               data = dl_node.read_node(camera_node + '/control/list-images/ready')
+               time.sleep(0.01)
+            payload.set_bool8(False)
+            dl_node.write_node(camera_node + '/control/list-images/request',payload)
+    else:
+        data = dl_node.read_node(camera_node +'/control/connect-camera/ready')
+        if data.get_bool8():
+            dl_node.write_node(camera_node + '/control/connect-camera/request', data)
+            while data.get_bool8():
+                data = dl_node.read_node(camera_node + '/control/connect-camera/ready')
+                time.sleep(0.01)
+            data.set_bool8(False)
+            dl_node.write_node(camera_node + '/control/connect-camera/request',
                            data)
-    data = dl_node.read_node(camera_node + '/control/capture/ready')
     payload = Variant()
-    count = 0
-    while not data.get_bool8(): 
+    if simulate: 
+        start = time_ns()
+        index_read = Variant()
+        payload.set_bool8(True)
+        index_read.set_uint32(run_count % sim_images)
+        dl_node.write_node(camera_node + '/input/index-of-image-to-load', index_read)
+        time.sleep(0.01)
+        dl_node.write_node(camera_node +'/control/load/request', payload)
+        data = dl_node.read_node(camera_node + '/control/load/ready')
+        while data.get_bool8():
+            data = dl_node.read_node(camera_node + '/control/load/ready')
+            time.sleep(0.01)
+        count = 0
+        while not data.get_bool8(): 
+            payload.set_bool8(False)
+            dl_node.write_node(camera_node +'/control/load/request',payload)
+            time.sleep(0.01)
+            count = count + 1
+            data = dl_node.read_node(camera_node + '/control/load/ready')
+            if count >50 : 
+                return False, ErrorCodes.DL_FAIL
+        end = time_ns()
+        dl_node.write_cature_time_node((end - start)* 1E-6)
+
+    else:
+        data = dl_node.read_node(camera_node + '/control/capture/ready')
+        count = 0
+        while not data.get_bool8(): 
+            payload.set_bool8(False)
+            dl_node.write_node(camera_node + '/control/capture/request', payload)
+            data = dl_node.read_node(camera_node + '/control/capture/ready')
+            time.sleep(0.010)
+            count = count + 1
+            if count >50 : 
+                return False, ErrorCodes.DL_FAIL
+
+        payload.set_bool8(True)
+        dl_node.write_node(camera_node + '/control/capture/request', payload)
+        start = time_ns()
+        data = dl_node.read_node(camera_node + '/control/capture/ready')
+        count = 0
+        while data.get_bool8():
+            data = dl_node.read_node(camera_node + '/control/capture/ready')
+            time.sleep(0.010)
+            count = count + 1
+            if count >50 : 
+                payload.set_bool8(False)
+                dl_node.write_node(camera_node + '/control/capture/request', payload)
+                return False, ErrorCodes.DL_FAIL
+            
+        end = time_ns() 
+        dl_node.write_cature_time_node((end - start)* 1E-6)
         payload.set_bool8(False)
         dl_node.write_node(camera_node + '/control/capture/request', payload)
         data = dl_node.read_node(camera_node + '/control/capture/ready')
-        time.sleep(0.050)
-        count = count + 1
-        if count >50 : 
-            return False, ErrorCodes.DL_FAIL
-
-    payload.set_bool8(True)
-    dl_node.write_node(camera_node + '/control/capture/request', payload)
-    start = time_ns()
-    data = dl_node.read_node(camera_node + '/control/capture/ready')
-    count = 0
-    while data.get_bool8():
-        data = dl_node.read_node(camera_node + '/control/capture/ready')
-        time.sleep(0.050)
-        count = count + 1
-        if count >50 : 
-            payload.set_bool8(False)
-            dl_node.write_node(camera_node + '/control/capture/request', payload)
-            return False, ErrorCodes.DL_FAIL
-            
-    end = time_ns() 
-    dl_node.write_cature_time_node((end - start)* 1E-6)
-    payload.set_bool8(False)
-    dl_node.write_node(camera_node + '/control/capture/request', payload)
-    data = dl_node.read_node(camera_node + '/control/capture/ready')
-    while not data.get_bool8():
-        data = dl_node.read_node(camera_node +'/control/capture/ready')
-        time.sleep(0.050)
+        while not data.get_bool8():
+            data = dl_node.read_node(camera_node +'/control/capture/ready')
+            time.sleep(0.010)
     r = dl_node.read_image(camera_node + '/output/image/data')
     img = np.frombuffer(r, dtype=np.uint8)
+    #cv.imwrite('img' + str(run_count) + '.png',img.reshape((1080,1440)))
     data = img.astype(np.float64)
     if data.size == 0:
         return
@@ -355,6 +392,7 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
             _max = np.max(tm_data)
             tm_data = (tm_data * 255) / _max
             tm_data = tm_data.astype(np.uint8)
+            break
     if c is not None:
         
         if 'c' in use_template: 
@@ -423,6 +461,7 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         locations.append(loc_x)
     cv.imwrite(img_loc,data)
     dl_node.write_locations(locations)
-
-
+    data = cv.resize(data,(720,540))
+    data = data.astype(np.uint8).flatten()
+    dl_node.write_bounding_box_img(data)
     return True, ErrorCodes.NO_ERROR

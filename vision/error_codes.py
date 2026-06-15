@@ -5,3 +5,4 @@ class ErrorCodes(Enum):
     NO_SCREWS = 1
     VISION_EXCEPTION = 2
     DL_FAIL = 3
+    UNKOWN_EXCEPTION = 4

@@ -1,10 +1,12 @@
-import ctrlxdatalayer
 from api_helper.ctrlx_data_layer_helper import get_provider, get_client
 import os
 # SPDX-FileCopyrightText: Bosch Rexroth AG
 #
 # SPDX-License-Identifier: MIT
 
+import ctrlxdatalayer
+import ctypes
+import numpy as np
 import ctrlxdatalayer
 from comm.datalayer import NodeClass
 from ctrlxdatalayer.provider import Provider
@@ -76,6 +78,9 @@ class Node:
     def set_value(self, value: Variant):
         """set_value"""
         self._data = value
+
+    def copy_value(self, value: Variant): 
+        self.copy_value(value)
 
     def get_value(self): 
         return self._data 
@@ -158,11 +163,12 @@ class CtrlxDlAPi():
         self.__error_code_node = None
         self.__inference_time_node = None
         self.__capture_time_node = None
-        pass
+        self.__bounding_box_img = None
+     
     def start_sys(self, datalayer_system): 
         self.__provider, connection_string = get_provider(
-        datalayer_system, ip="192.168.3.138", ssl_port=443)
-        self.__client, connection_string = get_client( datalayer_system, ip="192.168.3.138", ssl_port=443)
+        datalayer_system, ip="192.168.1.237", ssl_port=443)
+        self.__client, connection_string = get_client( datalayer_system, ip="192.168.1.237", ssl_port=443)
         if self.__provider is not None and self.__client is not None: 
             self.__provider.start()
             return True 
@@ -233,6 +239,12 @@ class CtrlxDlAPi():
         self.__error_code_node = Node(self.__provider, root_node + '/Status/ErrorDescription', 'types/datalayer/string', str_value,
                                    read_only)
         self.__error_code_node.register_node()
+
+        img_arr = Variant()
+        start = [0]*(720*540)
+        img_arr.set_array_uint8(start)
+        self.__bounding_box_img = Node(self.__provider, root_node + '/Status/BoundingBoxImg','types/datalayer/raw', img_arr,read_only)
+        self.__bounding_box_img.register_node()
         
     def get_request(self): 
         return self.__request_node.get_value().get_bool8()
@@ -292,7 +304,12 @@ class CtrlxDlAPi():
         ok = var_result.set_flatbuffers(builder.Output())
         self.__result_node.set_value(var_result)
 
-    def read_image(self,image_node): 
+    def write_bounding_box_img(self,flat_img):
+        img = Variant()
+        img.set_array_uint8(flat_img.tolist())
+        self.__bounding_box_img.set_value(img)
+
+    def read_image(self,image_node):
        ok, img =  self.__client.read_sync(image_node)
        return img.get_data() 
     
@@ -320,6 +337,7 @@ class CtrlxDlAPi():
             self.__provider.stop()
         if self.__client is not None: 
             self.__client.close()
-    
+
+
 
  
