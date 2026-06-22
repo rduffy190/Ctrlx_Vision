@@ -260,12 +260,44 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
             dl_node.write_node(camera_node + '/control/list-images/request',payload)
     else:
         data = dl_node.read_node(camera_node +'/control/connect-camera/ready')
+        count = 0 
         if data.get_bool8():
             dl_node.write_node(camera_node + '/control/connect-camera/request', data)
             while data.get_bool8():
                 data = dl_node.read_node(camera_node + '/control/connect-camera/ready')
+                count = count + 1
                 time.sleep(0.01)
+                if count > 200: 
+                    payload = Variant()
+                    payload.set_bool8(True)
+                    dl_node.write_node(camera_node + '/control/disconnect-camera/request',payload)
+                    time.sleep(0.05)
+                    data = dl_node.read_node(camera_node +'/control/disconnect-camera/ready')
+                    cnt2 = 0
+                    while data.get_bool8(): 
+                        data = dl_node.read_node(camera_node +'/control/disconnect-camera/ready')
+                        time.sleep(0.01)
+                        cnt2 = cnt2 + 1 
+                        if cnt2 > 100: 
+                            break
+                    payload.set_bool8(False) 
+                    dl_node.write_node(camera_node + '/control/disconnect-camera/request',payload)
+                    payload.set_bool8(True)
+                    dl_node.write_node(camera_node + '/control/reset/request', payload)
+                    time.sleep(0.05)
+                    data = dl_node.read_node(camera_node + '/control/reset/ready')
+                    cnt2 = 0
+                    while data.get_bool8(): 
+                        data = dl_node.read_node(camera_node + '/control/reset/ready')
+                        time.sleep(0.01)
+                        cnt2 = cnt2 + 1 
+                        if cnt2 > 50: 
+                            break
+                    payload.set_bool8(False)
+                    dl_node.write_node(camera_node + '/control/reset/request', payload)
+                    return False, ErrorCodes.CAMMERA_CONNECTION_FAIL
             data.set_bool8(False)
+            count = 0
             dl_node.write_node(camera_node + '/control/connect-camera/request',
                            data)
     payload = Variant()
@@ -347,10 +379,18 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
         pt_src = get_corners(data)
     except Exception as e: 
         cv.imwrite(img_loc,data)
+        data = cv.resize(data,(720,540))
+        data = data.astype(np.uint8).flatten()
+        dl_node.write_bounding_box_img(data)
+        dl_node.write_new_img(True)
         return False, ErrorCodes.NO_SCREWS
     found = True
     if pt_src.size == 0:
         cv.imwrite(img_loc,data)
+        data = cv.resize(data,(720,540))
+        data = data.astype(np.uint8).flatten()
+        dl_node.write_bounding_box_img(data)
+        dl_node.write_new_img(True)
         return False, ErrorCodes.NO_SCREWS
     for pt in pt_src:
         if pt[0] ==0 and pt[1] == 0:
@@ -358,7 +398,11 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
             break
     if not found:
         cv.imwrite(img_loc,data)
-        return False, ErrorCodes.NO_SCREWS
+        data = cv.resize(data,(720,540))
+        data = data.astype(np.uint8).flatten()
+        dl_node.write_bounding_box_img(data)
+        dl_node.write_new_img(True)
+        return False, ErrorCodes.LESS_THAN_FOUR_SCREWS_OR_DIST_WRONG
    
     screw_from_edge = 15
     zero_offset = 15
@@ -464,4 +508,5 @@ def run_vision(dl_node:CtrlxDlAPi, camera_node, inference_node, img_loc,use_temp
     data = cv.resize(data,(720,540))
     data = data.astype(np.uint8).flatten()
     dl_node.write_bounding_box_img(data)
+    dl_node.write_new_img(True)
     return True, ErrorCodes.NO_ERROR

@@ -151,6 +151,122 @@ class Node:
         """__on_metadata"""
         cb(Result.OK, self._metadata)
 
+class ListenNode:
+    def __init__(self, api, provider: Provider, nodeAddress: str, typeAddress: str,
+                 initialValue: Variant, meta_build):
+        """__init__"""
+        self._cbs = ProviderNodeCallbacks(
+            self.__on_create,
+            self.__on_remove,
+            self.__on_browse,
+            self.__on_read,
+            self.__on_write,
+            self.__on_metadata,
+        )
+        self.__api = api 
+
+        self._providerNode = ProviderNode(self._cbs)
+        self._provider = provider
+        self._nodeAddress = nodeAddress
+        self._typeAddress = typeAddress
+        self._data = initialValue
+        self._metadata = meta_build(nodeAddress,typeAddress)
+
+
+    def register_node(self):
+        """register_node"""
+        return self._provider.register_node(self._nodeAddress,
+                                            self._providerNode)
+
+    def unregister_node(self):
+        """unregister_node"""
+        self._provider.unregister_node(self._nodeAddress)
+        self._metadata.close()
+        self._data.close()
+
+    def set_value(self, value: Variant):
+        """set_value"""
+        self._data = value
+
+    def copy_value(self, value: Variant): 
+        self.copy_value(value)
+
+    def get_value(self): 
+        return self._data 
+
+    def __on_create(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        data: Variant,
+        cb: NodeCallback,
+    ):
+        """__on_create"""
+        cb(Result.OK, data)
+
+    def __on_remove(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        cb: NodeCallback,
+    ):
+        """__on_remove"""
+        cb(Result.UNSUPPORTED, None)
+
+    def __on_browse(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        cb: NodeCallback,
+    ):
+        """__on_browse"""
+        with Variant() as new_data:
+            new_data.set_array_string([])
+            cb(Result.OK, new_data)
+
+    def __on_read(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        data: Variant,
+        cb: NodeCallback,
+    ):
+        """__on_read"""
+        new_data = self._data
+        cb(Result.OK, new_data)
+
+    def __on_write(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        data: Variant,
+        cb: NodeCallback,
+    ):
+        """__on_write"""
+        if self._data.get_type() != data.get_type():
+            cb(Result.TYPE_MISMATCH, None)
+            return
+
+        result, self._data = data.clone()
+        if self._data.get_bool8(): 
+            self._data.set_bool8(False)
+            cb(Result.OK, self._data)
+            self.__api.write_new_img(False)
+        else:
+            cb(Result.OK, self._data)
+
+        
+
+
+    def __on_metadata(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        cb: NodeCallback,
+    ):
+        """__on_metadata"""
+        cb(Result.OK, self._metadata)
+
 class CtrlxDlAPi():
     def __init__(self): 
         self.__provider = None
@@ -164,11 +280,13 @@ class CtrlxDlAPi():
         self.__inference_time_node = None
         self.__capture_time_node = None
         self.__bounding_box_img = None
+        self.__new_img = None
+        self.__img_ack = None
      
     def start_sys(self, datalayer_system): 
         self.__provider, connection_string = get_provider(
-        datalayer_system, ip="192.168.1.237", ssl_port=443)
-        self.__client, connection_string = get_client( datalayer_system, ip="192.168.1.237", ssl_port=443)
+        datalayer_system, ip="192.168.10.139", ssl_port=443)
+        self.__client, connection_string = get_client( datalayer_system, ip="192.168.10.139", ssl_port=443)
         if self.__provider is not None and self.__client is not None: 
             self.__provider.start()
             return True 
@@ -243,8 +361,18 @@ class CtrlxDlAPi():
         img_arr = Variant()
         start = [0]*(720*540)
         img_arr.set_array_uint8(start)
-        self.__bounding_box_img = Node(self.__provider, root_node + '/Status/BoundingBoxImg','types/datalayer/raw', img_arr,read_only)
+        self.__bounding_box_img = Node(self.__provider, root_node + '/ClientNodes/BoundingBoxImg','types/datalayer/raw', img_arr,read_only)
         self.__bounding_box_img.register_node()
+
+        new_img = Variant()
+        new_img.set_bool8(False)
+        self.__new_img = Node(self.__provider, root_node + '/ClientNodes/NewImg','types/datalayer/bool8', new_img,read_only)
+        self.__new_img.register_node()
+
+        new_img = Variant()
+        new_img.set_bool8(False)
+        self.__img_ack= ListenNode(self,self.__provider, root_node + '/ClientNodes/ImgAck','types/datalayer/bool8', new_img,read_write)
+        self.__img_ack.register_node()
         
     def get_request(self): 
         return self.__request_node.get_value().get_bool8()
@@ -308,6 +436,11 @@ class CtrlxDlAPi():
         img = Variant()
         img.set_array_uint8(flat_img.tolist())
         self.__bounding_box_img.set_value(img)
+
+    def write_new_img(self, value:bool): 
+        new_img = Variant()
+        new_img.set_bool8(value)
+        self.__new_img.set_value(new_img)
 
     def read_image(self,image_node):
        ok, img =  self.__client.read_sync(image_node)
